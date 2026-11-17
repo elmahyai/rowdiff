@@ -1,0 +1,1559 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Compare two CSV files by column — free, private, in your browser | rowdiff</title>
+<meta name="description" content="Diff two CSV files by a key column and see added, removed and changed rows. Runs entirely in your browser — no upload, no account. Handles semicolons, quotes, UTF-16 and amount tolerances.">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://rowdiff.dev/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Compare two CSV files by column — free and private">
+<meta property="og:description" content="See exactly which rows were added, removed or changed. Runs in your browser, nothing is uploaded.">
+<meta property="og:url" content="https://rowdiff.dev/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%87%84%3C/text%3E%3C/svg%3E">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "rowdiff",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Any (web, macOS, Linux, Windows)",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+  "description": "Compare two CSV files by a key column. Finds added, removed and changed rows, with numeric tolerances and CI report formats."
+}
+</script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff; --fg: #16181d; --muted: #5c6470; --line: #e3e6ea;
+    --card: #f7f8fa; --accent: #1a56db; --accent-fg: #ffffff;
+    --add: #06732f; --del: #b3261e; --chg: #8a5a00; --addbg: #e8f6ed; --delbg: #fdeceb; --chgbg: #fdf6e3;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --fg: #e9ecf1; --muted: #98a1b0; --line: #262b34;
+      --card: #171a21; --accent: #6b9bff; --accent-fg: #0b1220;
+      --add: #5fd48a; --del: #ff8a80; --chg: #ffcc66;
+      --addbg: #10291a; --delbg: #2e1414; --chgbg: #2b2310;
+    }
+  }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1080px; margin-inline: auto; padding: 0 20px; }
+  header.site { border-bottom: 1px solid var(--line); padding: 14px 0; position: sticky; top: 0; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); z-index: 20; }
+  header.site .wrap { display: flex; align-items: center; gap: 16px; }
+  .brand { font-weight: 700; letter-spacing: -0.02em; font-size: 1.05rem; text-decoration: none; color: var(--fg); }
+  .brand span { color: var(--accent); }
+  header.site nav { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: .9rem; }
+  header.site nav a { color: var(--muted); text-decoration: none; }
+  header.site nav a:hover { color: var(--fg); }
+  .btn { display: inline-block; padding: .55rem 1rem; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--fg); font-size: .9rem; font-weight: 600; text-decoration: none; cursor: pointer; font-family: inherit; }
+  .btn:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+  .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  .hero { padding: 56px 0 32px; }
+  h1 { font-size: clamp(1.7rem, 4vw, 2.6rem); line-height: 1.15; letter-spacing: -0.03em; margin: 0 0 .6rem; }
+  .lede { font-size: 1.08rem; color: var(--muted); max-width: 62ch; margin: 0 0 1.2rem; }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.6rem; }
+  .badge { font-size: .76rem; padding: .28rem .6rem; border-radius: 999px; background: var(--card); border: 1px solid var(--line); color: var(--muted); }
+
+  .panel { border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 18px; margin-bottom: 20px; }
+  .dropzone { border: 2px dashed var(--line); border-radius: 12px; padding: 26px 18px; text-align: center; transition: .15s; background: var(--bg); }
+  .dropzone.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--bg)); }
+  .dropzone h3 { margin: 0 0 .25rem; font-size: .95rem; }
+  .dropzone p { margin: 0 0 .9rem; font-size: .82rem; color: var(--muted); }
+  .files { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 700px) { .files { grid-template-columns: 1fr; } }
+  .fileinfo { font-size: .78rem; margin-top: .6rem; min-height: 1.2em; color: var(--muted); font-family: var(--mono); word-break: break-all; }
+  .fileinfo.ok { color: var(--add); }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 4px; }
+  .field { display: flex; flex-direction: column; gap: .25rem; }
+  .field label { font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  .field input, .field select { font: inherit; font-size: .9rem; padding: .45rem .6rem; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); min-width: 9rem; }
+  .field input[type=number] { min-width: 6.5rem; }
+  .checkline { display: flex; flex-wrap: wrap; gap: 14px; font-size: .84rem; color: var(--muted); margin-top: 12px; }
+  .checkline label { display: flex; gap: .4rem; align-items: center; cursor: pointer; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; margin: 18px 0; }
+  .stat { border: 1px solid var(--line); border-radius: 10px; padding: .6rem .8rem; background: var(--bg); }
+  .stat b { display: block; font-size: 1.4rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .stat.a b { color: var(--add); } .stat.d b { color: var(--del); } .stat.c b { color: var(--chg); }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 0; flex-wrap: wrap; }
+  .tab { border: none; background: none; font: inherit; font-size: .86rem; font-weight: 600; color: var(--muted); padding: .55rem .8rem; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab.active { color: var(--fg); border-bottom-color: var(--accent); }
+  .tabpane { display: none; padding-top: 14px; }
+  .tabpane.active { display: block; }
+  .scroll { max-height: 460px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+
+  table.diff { border-collapse: collapse; width: 100%; font-size: .82rem; font-family: var(--mono); }
+  table.diff th, table.diff td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+  table.diff thead th { position: sticky; top: 0; background: var(--card); z-index: 1; font-family: var(--sans); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  tr.rowchanged td { background: var(--chgbg); }
+  tr.rowadded td { background: var(--addbg); }
+  tr.rowremoved td { background: var(--delbg); }
+  .was { color: var(--del); text-decoration: line-through; }
+  .now { color: var(--add); font-weight: 600; }
+  .delta { font-size: .7rem; color: var(--chg); }
+  .tag { font-size: .68rem; font-family: var(--sans); padding: .05rem .35rem; border-radius: 4px; border: 1px solid currentColor; }
+  .tag.a { color: var(--add); } .tag.d { color: var(--del); } .tag.c { color: var(--chg); }
+  td.tagcell { width: 1%; white-space: nowrap; }
+  td.keycell { font-weight: 600; color: var(--fg); }
+  .empty { padding: 26px; text-align: center; color: var(--muted); font-size: .88rem; font-style: italic; }
+
+  .warnbox { border-left: 3px solid var(--chg); background: var(--chgbg); padding: .5rem .8rem; border-radius: 0 6px 6px 0; font-size: .82rem; margin: .4rem 0; }
+
+  section.prose { padding: 24px 0 8px; }
+  section.prose h2 { font-size: 1.25rem; letter-spacing: -0.01em; margin: 2rem 0 .6rem; }
+  section.prose h3 { font-size: .95rem; margin: 1.4rem 0 .3rem; }
+  section.prose p, section.prose li { color: var(--muted); font-size: .94rem; }
+  section.prose code { font-family: var(--mono); font-size: .85em; background: var(--card); padding: .1rem .3rem; border-radius: 4px; border: 1px solid var(--line); }
+  pre { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: .82rem; line-height: 1.5; }
+  details { border: 1px solid var(--line); border-radius: 10px; padding: .8rem 1rem; margin: .5rem 0; background: var(--card); }
+  details summary { cursor: pointer; font-weight: 600; font-size: .92rem; }
+  details p, details li { font-size: .88rem; }
+  footer.site { border-top: 1px solid var(--line); margin-top: 40px; padding: 24px 0; font-size: .82rem; color: var(--muted); }
+  footer.site a { color: var(--muted); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="/">row<span>diff</span></a>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#cli">Command line</a>
+      <a href="#faq">FAQ</a>
+      <a class="btn primary" href="#app">Compare files</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <h1>Compare two CSV files by column</h1>
+    <p class="lede">
+      Drop in two exports and see exactly which rows were <strong>added</strong>, <strong>removed</strong>
+      or <strong>changed</strong> — matched by an ID, not by line number. Amounts within a tolerance count as equal,
+      so rounding never shows up as a fake difference.
+    </p>
+    <div class="badges">
+      <span class="badge">🔒 Files never leave your browser</span>
+      <span class="badge">No account, no upload, no tracking</span>
+      <span class="badge">Semicolon, tab & UTF‑16 aware</span>
+      <span class="badge">Free</span>
+    </div>
+  </div>
+
+  <section id="app" class="panel">
+    <div class="files">
+      <div class="dropzone" id="dz-left">
+        <h3>Before</h3>
+        <p>the older export</p>
+        <button class="btn" type="button" data-pick="left">Choose CSV…</button>
+        <input type="file" id="file-left" accept=".csv,.tsv,.txt,text/csv,text/plain" class="sr-only">
+        <div class="fileinfo" id="info-left"></div>
+      </div>
+      <div class="dropzone" id="dz-right">
+        <h3>After</h3>
+        <p>the newer export</p>
+        <button class="btn" type="button" data-pick="right">Choose CSV…</button>
+        <input type="file" id="file-right" accept=".csv,.tsv,.txt,text/csv,text/plain" class="sr-only">
+        <div class="fileinfo" id="info-right"></div>
+      </div>
+    </div>
+
+    <div class="controls" style="margin-top:16px">
+      <div class="field">
+        <label for="key">Key column</label>
+        <select id="key"><option value="">— compare by position —</option></select>
+      </div>
+      <div class="field">
+        <label for="tolerance">Amount tolerance</label>
+        <input type="number" id="tolerance" value="0" min="0" step="0.01">
+      </div>
+      <div class="field">
+        <label for="format">Report</label>
+        <select id="format">
+          <option value="table">Table (on screen)</option>
+          <option value="md">Markdown</option>
+          <option value="html">HTML</option>
+          <option value="json">JSON</option>
+          <option value="csv">CSV</option>
+        </select>
+      </div>
+      <button class="btn primary" id="run" disabled>Compare</button>
+      <button class="btn" id="demo" title="Load two small sample files">Try an example</button>
+    </div>
+
+    <div class="checkline">
+      <label><input type="checkbox" id="ignorecase" checked> Ignore case</label>
+      <label><input type="checkbox" id="collapse" checked> Collapse spaces</label>
+      <label><input type="checkbox" id="currency" checked> Read currency amounts</label>
+    </div>
+
+    <div id="warnings"></div>
+    <div id="results" hidden>
+      <div class="stats" id="stats"></div>
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-pane="pane-table">Rows</button>
+        <button class="tab" data-pane="pane-columns">Columns</button>
+        <button class="tab" data-pane="pane-export">Export</button>
+      </div>
+      <div class="tabpane active" id="pane-table"><div class="scroll" id="table-host"></div></div>
+      <div class="tabpane" id="pane-columns"><div class="scroll" id="columns-host"></div></div>
+      <div class="tabpane" id="pane-export">
+        <p style="font-size:.85rem;color:var(--muted);margin-top:0">Copy or download the report. Nothing is sent anywhere.</p>
+        <textarea id="export-text" readonly style="width:100%;height:260px;font-family:var(--mono);font-size:.78rem;padding:.7rem;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg)"></textarea>
+        <div style="margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn" id="copy">Copy</button>
+          <button class="btn" id="download">Download</button>
+        </div>
+      </div>
+    </div>
+    <div id="placeholder" class="empty">Load two CSV files to see the differences.</div>
+  </section>
+
+  <section class="prose" id="how">
+    <h2>Why not just use a text diff?</h2>
+    <p>
+      Line-based diff tools compare the third line to the third line. Real exports don't work that way: rows get
+      inserted, deleted, re-sorted, and dates change. You end up with a wall of noise and no answer to the only
+      question that matters — <em>what actually changed for this record?</em>
+    </p>
+    <p>
+      <code>rowdiff</code> joins the two files on a key column (an invoice number, SKU, email, account) and reports
+      per-field changes. Numeric columns are compared with a tolerance so <code>2750.25</code> vs
+      <code>2750.30</code> is a 0.05 drift you can allow — or not.
+    </p>
+
+    <h3>Typical jobs</h3>
+    <ul>
+      <li>Reconciling a bank statement export against your ledger.</li>
+      <li>Checking that last night's data migration changed only the rows it was supposed to.</li>
+      <li>Reviewing what an ERP or Shopify export actually changed week over week.</li>
+      <li>A CI check that fails the build when a fixture file drifts.</li>
+    </ul>
+
+    <h2 id="cli">The command line version</h2>
+    <p>Same engine, better for pipelines and big files. Zero dependencies, Node 18+.</p>
+    <pre>npm install -g rowdiff
+
+rowdiff before.csv after.csv --key invoice_id
+
+# allow 1 cent of rounding drift, only fail on real changes
+rowdiff before.csv after.csv -k invoice_id -t 0.01 --fail-on changed
+
+# a self-contained HTML report you can email
+rowdiff before.csv after.csv -k invoice_id -f html -o report.html
+
+# GitHub Actions
+- run: rowdiff before.csv after.csv -k invoice_id -f junit -o junit.xml</pre>
+    <p>
+      Exit code <code>0</code> means no differences, <code>1</code> means differences were found,
+      <code>2</code> means a bad file or option. That is what makes it usable as a gate.
+    </p>
+
+    <h2 id="faq">FAQ</h2>
+    <details>
+      <summary>Are my files uploaded?</summary>
+      <p>
+        No. This page is a single HTML file. The parsing and comparison run in your browser and the file contents
+        never touch a network. You can also save the page and use it offline, or check the network tab: there are
+        no requests after the page loads.
+      </p>
+    </details>
+    <details>
+      <summary>What is the "key column"?</summary>
+      <p>
+        The column that identifies a row — <code>invoice_id</code>, <code>sku</code>, <code>email</code>.
+        Rows with the same key on both sides are compared field by field. Leave it empty to pair rows by
+        position instead, which is what you want for two files with identical structure.
+      </p>
+    </details>
+    <details>
+      <summary>Does it handle European number formats?</summary>
+      <p>
+        Yes. <code>€1.234,50</code> and <code>€1,234.50</code> both parse to 1234.5 when "Read currency amounts"
+        is on, and both separators are disambiguated by position.
+      </p>
+    </details>
+    <details>
+      <summary>How big can the files be?</summary>
+      <p>
+        The browser version holds both files in memory — comfortably fine into the low hundreds of thousands of
+        rows. For very large files use the CLI, which is faster and can stream reports to disk.
+      </p>
+    </details>
+    <details>
+      <summary>What does the paid version add?</summary>
+      <p>
+        The comparison engine and the browser tool are free and stay free. Pro adds the things a team needs:
+        HTML/Markdown/JUnit/SARIF reports, <code>--detect --explain</code> key scoring detail, and priority support.
+        €29 once, no subscription. If it would not pay for itself, email us and we will send a key anyway.
+      </p>
+    </details>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <p>
+      rowdiff — built <span id="build">2026-11-17</span>.
+      Free and open source core. <a href="https://github.com/rowdiff/rowdiff">Source on GitHub</a>.
+    </p>
+  </div>
+</footer>
+
+<script>
+/* rowdiff engine - generated by tools/build-web.mjs. Do not edit index.html directly. */
+(function () {
+'use strict';
+// RFC4180 CSV parsing with delimiter sniffing. No dependencies, no streaming assumptions:
+// the whole file is materialised because diffing needs both sides in memory anyway.
+
+const CANDIDATES = [',', ';', '\t', '|'];
+
+class CsvError extends Error {}
+
+function stripBom(text) {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
+// Accepts a string, Buffer (Node) or ArrayBuffer/Uint8Array (browser) so the same
+// parser runs in the CLI and in the static web app.
+function decode(buf) {
+  if (typeof buf === 'string') return stripBom(buf);
+
+  let bytes;
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(buf)) bytes = buf;
+  else if (buf instanceof Uint8Array) bytes = buf;
+  else if (buf instanceof ArrayBuffer) bytes = new Uint8Array(buf);
+  else return stripBom(String(buf));
+
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return stripBom(new TextDecoder('utf-16le').decode(bytes.subarray(2)));
+  }
+  return stripBom(new TextDecoder('utf-8').decode(bytes));
+}
+
+// Pick the delimiter that yields the most consistent column count across the first
+// non-empty lines. Ties go to the earlier candidate, which keeps comma-default behaviour.
+function sniffDelimiter(text) {
+  const lines = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (line.trim() !== '') lines.push(line);
+    if (lines.length >= 20) break;
+  }
+  if (lines.length === 0) return ',';
+
+  let best = { delim: ',', score: -1 };
+  for (const delim of CANDIDATES) {
+    const counts = lines
+      .map((line) => splitRecord(line, delim).length)
+      .filter((n) => n > 1);
+    if (counts.length === 0) continue;
+    const mode = counts[0];
+    const consistent = counts.filter((n) => n === mode).length;
+    const score = consistent * 1000 + mode;
+    if (score > best.score) best = { delim, score };
+  }
+  return best.delim;
+}
+
+// Single-record split honouring quotes; used for sniffing where embedded newlines
+// cannot appear (we only look at physical lines).
+function splitRecord(line, delim) {
+  const out = [];
+  let field = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quoted) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else quoted = false;
+      } else field += ch;
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === delim) {
+      out.push(field);
+      field = '';
+    } else field += ch;
+  }
+  out.push(field);
+  return out;
+}
+
+function parseRecords(text, delim) {
+  const records = [];
+  let record = [];
+  let field = '';
+  let quoted = false;
+  let sawAnyChar = false;
+  let i = 0;
+
+  const endField = () => {
+    record.push(field);
+    field = '';
+  };
+  const endRecord = () => {
+    endField();
+    records.push(record);
+    record = [];
+  };
+
+  while (i < text.length) {
+    const ch = text[i];
+
+    if (quoted) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        quoted = false;
+        i++;
+        continue;
+      }
+      field += ch;
+      i++;
+      continue;
+    }
+
+    if (ch === '"' && field === '') {
+      quoted = true;
+      sawAnyChar = true;
+      i++;
+      continue;
+    }
+    if (ch === delim) {
+      endField();
+      sawAnyChar = true;
+      i++;
+      continue;
+    }
+    if (ch === '\r' && text[i + 1] === '\n') {
+      endRecord();
+      sawAnyChar = false;
+      i += 2;
+      continue;
+    }
+    if (ch === '\n' || ch === '\r') {
+      endRecord();
+      sawAnyChar = false;
+      i++;
+      continue;
+    }
+    field += ch;
+    sawAnyChar = true;
+    i++;
+  }
+
+  if (quoted) throw new CsvError('Unterminated quoted field (missing closing ")');
+  if (sawAnyChar || field !== '' || record.length > 0) endRecord();
+
+  // Drop a trailing record that is a single empty field: that is the newline at EOF.
+  while (records.length > 0) {
+    const last = records[records.length - 1];
+    if (last.length === 1 && last[0] === '') records.pop();
+    else break;
+  }
+  return records;
+}
+
+function parse(input, options = {}) {
+  const text = decode(input);
+  const delimiter = options.delimiter === 'auto' || options.delimiter == null
+    ? sniffDelimiter(text)
+    : options.delimiter;
+  if (text.trim() === '') {
+    return { header: [], rows: [], delimiter, duplicateHeaders: [], widths: new Set() };
+  }
+
+  const records = parseRecords(text, delimiter);
+  if (records.length === 0) {
+    return { header: [], rows: [], delimiter, duplicateHeaders: [], widths: new Set() };
+  }
+
+  const header = records[0].map((h) => h.trim());
+  const duplicateHeaders = header.filter((h, idx) => header.indexOf(h) !== idx);
+  const widths = new Set(records.map((r) => r.length));
+  const rows = [];
+
+  for (let r = 1; r < records.length; r++) {
+    const rec = records[r];
+    if (rec.length === 1 && rec[0] === '') continue;
+    const obj = {};
+    for (let c = 0; c < header.length; c++) {
+      const name = header[c] || `column_${c + 1}`;
+      obj[name] = rec[c] === undefined ? '' : rec[c];
+    }
+    rows.push(obj);
+  }
+
+  return { header, rows, delimiter, duplicateHeaders, widths };
+}
+
+// Core diff engine. Everything here is pure: input rows in, result object out.
+// The CLI, the web app and the report writers all consume this single shape.
+
+const NUMBER_RE = /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/;
+
+const DEFAULTS = {
+  keys: null,
+  compare: null,
+  tolerance: 0,
+  relativeTolerance: 0,
+  ignoreCase: false,
+  collapseWhitespace: false,
+  trim: true,
+  numericTolerance: true,
+  stripCurrency: false,
+};
+
+const CURRENCY_RE = /^([-+]?)\s*([€$£¥])?\s*([\d.,\s']+)\s*([€$£¥])?$/;
+
+// Both "1,234.50" and "1.234,50" are legitimate. When both separators appear the
+// rightmost is the decimal point; when only one appears it is ambiguous, so it is
+// read as a decimal point unless it is followed by exactly three digits.
+function unformatNumber(digits) {
+  const cleaned = digits.replace(/[\s']/g, '');
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+
+  if (lastComma !== -1 && lastDot !== -1) {
+    const decimal = lastComma > lastDot ? ',' : '.';
+    const thousands = decimal === ',' ? /[.]/g : /[,]/g;
+    return cleaned.replace(thousands, '').replace(decimal, '.');
+  }
+  const sep = lastComma !== -1 ? ',' : lastDot !== -1 ? '.' : null;
+  if (sep === null) return cleaned;
+  const tail = cleaned.slice(cleaned.lastIndexOf(sep) + 1);
+  const occurrences = cleaned.split(sep).length - 1;
+  if (tail.length === 3 && occurrences >= 1 && /^\d{3}$/.test(tail)) {
+    return cleaned.split(sep).join('');
+  }
+  return cleaned.replace(sep, '.');
+}
+
+function normText(value, opts) {
+  let v = value == null ? '' : String(value);
+  if (opts.trim) v = v.trim();
+  if (opts.collapseWhitespace) v = v.replace(/\s+/g, ' ');
+  if (opts.ignoreCase) v = v.toLowerCase();
+  return v;
+}
+
+function normKeyPart(value, opts) {
+  return normText(value, { ...opts, trim: true });
+}
+
+function parseNumber(raw, opts = {}) {
+  let v = raw == null ? '' : String(raw);
+  if (opts.trim !== false) v = v.trim();
+  if (v === '') return null;
+
+  if (opts.stripCurrency) {
+    const m = v.match(CURRENCY_RE);
+    if (m) {
+      const [, sign, pre, digits, post] = m;
+      if (pre && post) return null;
+      const cleaned = unformatNumber(digits);
+      const n = Number(cleaned);
+      if (!Number.isFinite(n)) return null;
+      return sign === '-' ? -n : n;
+    }
+  }
+  // Thousands separators are deliberately not stripped by default: "1,234" is as
+  // likely to be two columns as one number, and guessing wrong corrupts a diff.
+  if (!NUMBER_RE.test(v)) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Returns null when equivalent, otherwise a description of the difference.
+function compareCell(leftRaw, rightRaw, opts) {
+  const left = leftRaw == null ? '' : String(leftRaw);
+  const right = rightRaw == null ? '' : String(rightRaw);
+
+  const leftEmpty = left.trim() === '';
+  const rightEmpty = right.trim() === '';
+  if (leftEmpty && rightEmpty) return null;
+  if (leftEmpty || rightEmpty) {
+    return { kind: 'empty', left, right };
+  }
+
+  if (opts.numericTolerance) {
+    const ln = parseNumber(left, opts);
+    const rn = parseNumber(right, opts);
+    if (ln !== null && rn !== null) {
+      // Both sides numeric. Treat integer-looking strings with significant leading
+      // zeros as identifiers, not numbers, so "007" and "7" stay different.
+      const looksLikeCode =
+        (/^[-+]?0\d/.test(left.trim()) && !left.includes('.')) ||
+        (/^[-+]?0\d/.test(right.trim()) && !right.includes('.'));
+      if (!looksLikeCode) {
+        const delta = Math.abs(ln - rn);
+        // 1e-9 absorbs binary float representation error so "100.00" vs "100.01"
+        // is not reported as a difference at tolerance 0.01.
+        const allowed = Math.max(
+          opts.tolerance,
+          Math.abs(opts.relativeTolerance) * Math.max(Math.abs(ln), Math.abs(rn)),
+        ) + 1e-9;
+        if (delta <= allowed) return null;
+        return { kind: 'number', left, right, delta: rn - ln };
+      }
+    }
+  }
+
+  if (normText(left, opts) === normText(right, opts)) return null;
+  return { kind: 'text', left, right };
+}
+
+function keyOf(row, keys, opts) {
+  return keys.map((k) => normKeyPart(row[k], opts)).join('\u0000');
+}
+
+function describeKey(keyObj) {
+  return keyObj;
+}
+
+// Group rows by key so duplicate keys (common in real exports) pair up in file order
+// instead of collapsing into a last-one-wins map.
+function groupByKey(rows, keys, opts, side, report) {
+  const map = new Map();
+  for (const row of rows) {
+    const k = keyOf(row, keys, opts);
+    if (!map.has(k)) map.set(k, []);
+    else report.duplicateKeys.push({ side, key: pick(row, keys) });
+    map.get(k).push(row);
+  }
+  return map;
+}
+
+function pick(row, keys) {
+  if (!keys) return row;
+  const out = {};
+  for (const k of keys) out[k] = row[k];
+  return out;
+}
+
+function diff(left, right, options = {}) {
+  const opts = { ...DEFAULTS, ...options };
+  const keys = opts.keys && opts.keys.length > 0 ? opts.keys : null;
+
+  const columns = {
+    left: left.header.slice(),
+    right: right.header.slice(),
+    onlyLeft: left.header.filter((h) => !right.header.includes(h)),
+    onlyRight: right.header.filter((h) => !left.header.includes(h)),
+  };
+  columns.common = left.header.filter((h) => right.header.includes(h));
+
+  const report = { duplicateKeys: [], warnings: [] };
+
+  for (const h of left.duplicateHeaders || []) {
+    report.warnings.push(`Left file has duplicate column name "${h}"; later values win.`);
+  }
+  for (const h of right.duplicateHeaders || []) {
+    report.warnings.push(`Right file has duplicate column name "${h}"; later values win.`);
+  }
+
+  if (keys) {
+    for (const k of keys) {
+      if (!left.header.includes(k)) report.warnings.push(`Key column "${k}" missing from left file.`);
+      if (!right.header.includes(k)) report.warnings.push(`Key column "${k}" missing from right file.`);
+    }
+  } else if (columns.onlyLeft.length || columns.onlyRight.length) {
+    report.warnings.push(
+      'No key column given and the files have different columns; rows are compared by position, so shifted rows will look changed.',
+    );
+  }
+
+  const compareColumns = (opts.compare && opts.compare.length ? opts.compare : columns.common)
+    .filter((c) => !keys || !keys.includes(c));
+
+  for (const c of opts.compare || []) {
+    if (!columns.common.includes(c)) {
+      report.warnings.push(`Compare column "${c}" is not present in both files.`);
+    }
+  }
+
+  const result = {
+    meta: {
+      keys,
+      compareColumns,
+      tolerance: opts.tolerance,
+      relativeTolerance: opts.relativeTolerance,
+      options: opts,
+    },
+    columns,
+    summary: {
+      leftRows: left.rows.length,
+      rightRows: right.rows.length,
+      matched: 0,
+      added: 0,
+      removed: 0,
+      changed: 0,
+      changedCells: 0,
+      unchanged: 0,
+    },
+    added: [],
+    removed: [],
+    changed: [],
+    duplicateKeys: report.duplicateKeys,
+    warnings: report.warnings,
+    rowCountMismatch: left.rows.length !== right.rows.length,
+  };
+
+  // Without a key column there is nothing to join on, so rows pair up by position:
+  // that matches what people expect from "diff these two files".
+  const leftGroups = keys
+    ? groupByKey(left.rows, keys, opts, 'left', report)
+    : new Map(left.rows.map((row, i) => [`#${i}`, [row]]));
+  const rightGroups = keys
+    ? groupByKey(right.rows, keys, opts, 'right', report)
+    : new Map(right.rows.map((row, i) => [`#${i}`, [row]]));
+
+  const allKeys = new Set([...leftGroups.keys(), ...rightGroups.keys()]);
+
+  for (const k of allKeys) {
+    const lRows = leftGroups.get(k) || [];
+    const rRows = rightGroups.get(k) || [];
+    const pairs = Math.min(lRows.length, rRows.length);
+
+    for (let i = 0; i < pairs; i++) {
+      const before = lRows[i];
+      const after = rRows[i];
+      const changes = [];
+      for (const col of compareColumns) {
+        const d = compareCell(before[col], after[col], opts);
+        if (d) changes.push({ column: col, ...d });
+      }
+      if (changes.length === 0) {
+        result.summary.unchanged++;
+      } else {
+        result.summary.changed++;
+        result.summary.changedCells += changes.length;
+        result.changed.push({
+          key: keys ? describeKey(pick(before, keys)) : { row: Number(String(k).slice(1)) + 1 },
+          before,
+          after,
+          changes,
+        });
+      }
+      result.summary.matched++;
+    }
+
+    for (let i = pairs; i < lRows.length; i++) {
+      result.removed.push({ key: keys ? pick(lRows[i], keys) : null, row: lRows[i] });
+      result.summary.removed++;
+    }
+    for (let i = pairs; i < rRows.length; i++) {
+      result.added.push({ key: keys ? pick(rRows[i], keys) : null, row: rRows[i] });
+      result.summary.added++;
+    }
+  }
+
+  // Stable, predictable ordering: added/removed in file order, changes by key text.
+  if (keys) {
+    result.changed.sort((a, b) =>
+      String(JSON.stringify(a.key)).localeCompare(String(JSON.stringify(b.key))));
+  }
+
+  // Per-column churn, so reports can point at the column that actually broke.
+  result.columnStats = {};
+  for (const c of compareColumns) result.columnStats[c] = 0;
+  for (const ch of result.changed) {
+    for (const c of ch.changes) result.columnStats[c.column]++;
+  }
+
+  return result;
+}
+
+function hasDifferences(result) {
+  return result.summary.added + result.summary.removed + result.summary.changed > 0;
+}
+
+// Report writers. Each one takes the result object from src/diff.js and returns a string.
+// Free formats: text, json, csv. Pro formats: md, html, junit, sarif.
+
+const esc = {
+  html: (s) => String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;'),
+  xml: (s) => String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+    // XML 1.0 cannot carry most control characters; drop them rather than emit invalid XML.
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ''),
+};
+
+function keyLabel(entry, keys) {
+  if (!keys) return `row ${entry.key?.row ?? '?'}`;
+  return keys.map((k) => `${k}=${entry.key?.[k] ?? ''}`).join(' ');
+}
+
+function fmtDelta(d) {
+  if (d == null) return '';
+  const sign = d > 0 ? '+' : '';
+  const rounded = Math.abs(d) < 1e-9 ? 0 : d;
+  return `${sign}${Number(rounded.toFixed(6))}`;
+}
+
+function toText(result) {
+  const s = result.summary;
+  const lines = [];
+  const head = `rowdiff: ${s.leftRows} left rows vs ${s.rightRows} right rows`;
+  lines.push(head, '='.repeat(Math.min(head.length, 72)));
+
+  if (result.meta.keys) lines.push(`key: ${result.meta.keys.join(', ')}`);
+  else lines.push('key: none (rows compared by position)');
+  if (result.meta.compareColumns.length) {
+    lines.push(`columns: ${result.meta.compareColumns.join(', ')}`);
+  }
+  if (result.meta.tolerance || result.meta.relativeTolerance) {
+    lines.push(
+      `tolerance: ${result.meta.tolerance}` +
+      (result.meta.relativeTolerance ? ` (+${result.meta.relativeTolerance * 100}% relative)` : ''),
+    );
+  }
+  lines.push('');
+
+  for (const w of result.warnings) lines.push(`warning: ${w}`);
+  if (result.warnings.length) lines.push('');
+
+  if (result.duplicateKeys.length) {
+    const n = result.duplicateKeys.length;
+    lines.push(`note: ${n} duplicate key value(s); rows were paired in file order.`);
+    lines.push('');
+  }
+
+  if (result.changed.length) {
+    lines.push(`CHANGED (${result.changed.length})`);
+    for (const ch of result.changed) {
+      lines.push(`  ~ ${keyLabel(ch, result.meta.keys)}`);
+      for (const c of ch.changes) {
+        if (c.kind === 'number') {
+          lines.push(`      ${c.column}: ${c.left} -> ${c.right}  (${fmtDelta(c.delta)})`);
+        } else if (c.kind === 'empty') {
+          lines.push(`      ${c.column}: ${JSON.stringify(c.left)} -> ${JSON.stringify(c.right)}`);
+        } else {
+          lines.push(`      ${c.column}: ${JSON.stringify(c.left)} -> ${JSON.stringify(c.right)}`);
+        }
+      }
+    }
+    lines.push('');
+  }
+
+  if (result.added.length) {
+    lines.push(`ADDED (${result.added.length})`);
+    for (const a of result.added.slice(0, 50)) lines.push(`  + ${keyLabel(a, result.meta.keys)}`);
+    if (result.added.length > 50) lines.push(`  ... ${result.added.length - 50} more`);
+    lines.push('');
+  }
+
+  if (result.removed.length) {
+    lines.push(`REMOVED (${result.removed.length})`);
+    for (const r of result.removed.slice(0, 50)) lines.push(`  - ${keyLabel(r, result.meta.keys)}`);
+    if (result.removed.length > 50) lines.push(`  ... ${result.removed.length - 50} more`);
+    lines.push('');
+  }
+
+  lines.push(
+    `summary: ${s.added} added, ${s.removed} removed, ${s.changed} changed, ${s.unchanged} unchanged`,
+  );
+  return lines.join('\n') + '\n';
+}
+
+function toJson(result) {
+  return JSON.stringify(
+    {
+      summary: result.summary,
+      columns: result.columns,
+      meta: {
+        keys: result.meta.keys,
+        compareColumns: result.meta.compareColumns,
+        tolerance: result.meta.tolerance,
+        relativeTolerance: result.meta.relativeTolerance,
+      },
+      columnStats: result.columnStats,
+      added: result.added,
+      removed: result.removed,
+      changed: result.changed,
+      warnings: result.warnings,
+      duplicateKeys: result.duplicateKeys,
+    },
+    null,
+    2,
+  ) + '\n';
+}
+
+function csvCell(v) {
+  const s = v == null ? '' : String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function toCsv(result) {
+  const rows = [['change', 'key', 'column', 'before', 'after', 'delta']];
+  const keys = result.meta.keys;
+  const keyStr = (entry) => (keys ? keys.map((k) => entry.key?.[k] ?? '').join('|') : String(entry.key?.row ?? ''));
+
+  for (const ch of result.changed) {
+    for (const c of ch.changes) {
+      rows.push(['changed', keyStr(ch), c.column, c.left, c.right, c.kind === 'number' ? fmtDelta(c.delta) : '']);
+    }
+  }
+  for (const a of result.added) rows.push(['added', keyStr(a), '', '', '', '']);
+  for (const r of result.removed) rows.push(['removed', keyStr(r), '', '', '', '']);
+
+  return rows.map((r) => r.map(csvCell).join(',')).join('\n') + '\n';
+}
+
+function toMarkdown(result) {
+  const s = result.summary;
+  const out = [];
+  out.push('## CSV diff report', '');
+  out.push('| | count |', '|---|---:|');
+  out.push(`| left rows | ${s.leftRows} |`);
+  out.push(`| right rows | ${s.rightRows} |`);
+  out.push(`| **added** | **${s.added}** |`);
+  out.push(`| **removed** | **${s.removed}** |`);
+  out.push(`| **changed** | **${s.changed}** |`);
+  out.push(`| unchanged | ${s.unchanged} |`);
+  out.push('');
+
+  if (result.meta.keys) out.push(`Key: \`${result.meta.keys.join('`, `')}\``, '');
+  else out.push('Key: none — rows compared by position', '');
+
+  const churn = Object.entries(result.columnStats).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  if (churn.length) {
+    out.push('### Churn by column', '', '| column | changed cells |', '|---|---:|');
+    for (const [c, n] of churn) out.push(`| \`${c}\` | ${n} |`);
+    out.push('');
+  }
+
+  if (result.changed.length) {
+    out.push(`### Changed rows (${result.changed.length})`, '');
+    const cols = result.meta.compareColumns;
+    out.push(['key', ...cols].map((c) => `\`${c}\``).join(' | ').replace(/^/, '| ').concat(' |'));
+    out.push(['---', ...cols.map(() => '---')].join(' | ').replace(/^/, '| ').concat(' |'));
+    const cap = 200;
+    for (const ch of result.changed.slice(0, cap)) {
+      const cells = cols.map((c) => {
+        const change = ch.changes.find((x) => x.column === c);
+        if (!change) return ch.after[c] ?? '';
+        const was = change.left === '' ? '*(empty)*' : change.left;
+        const now = change.right === '' ? '*(empty)*' : change.right;
+        return `${was} → **${now}**`;
+      });
+      const keyStr = result.meta.keys
+        ? result.meta.keys.map((k) => ch.key?.[k] ?? '').join(' / ')
+        : `row ${ch.key?.row}`;
+      out.push(`| ${keyStr} | ${cells.join(' | ')} |`);
+    }
+    if (result.changed.length > cap) out.push('', `_…and ${result.changed.length - cap} more rows (see JSON/CSV report)._`);
+    out.push('');
+  }
+
+  if (result.added.length) {
+    out.push(`### Added (${result.added.length})`, '');
+    for (const a of result.added.slice(0, 100)) {
+      out.push(`- \`${result.meta.keys ? result.meta.keys.map((k) => a.key?.[k]).join('|') : 'row ' + a.key?.row}\``);
+    }
+    if (result.added.length > 100) out.push(`- _…and ${result.added.length - 100} more_`);
+    out.push('');
+  }
+
+  if (result.removed.length) {
+    out.push(`### Removed (${result.removed.length})`, '');
+    for (const r of result.removed.slice(0, 100)) {
+      out.push(`- \`${result.meta.keys ? result.meta.keys.map((k) => r.key?.[k]).join('|') : 'row ' + r.key?.row}\``);
+    }
+    if (result.removed.length > 100) out.push(`- _…and ${result.removed.length - 100} more_`);
+    out.push('');
+  }
+
+  if (result.warnings.length) {
+    out.push('### Warnings', '');
+    for (const w of result.warnings) out.push(`> ⚠️ ${w}`);
+    out.push('');
+  }
+
+  out.push('_Generated by rowdiff._');
+  return out.join('\n') + '\n';
+}
+
+function toHtml(result, { title = 'CSV diff report' } = {}) {
+  const s = result.summary;
+  const churn = Object.entries(result.columnStats).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+
+  const rows = result.changed.map((ch) => {
+    const cells = result.meta.compareColumns.map((c) => {
+      const change = ch.changes.find((x) => x.column === c);
+      if (!change) return `<td class="same">${esc.html(ch.after[c])}</td>`;
+      const delta = change.kind === 'number' ? ` <span class="delta">${esc.html(fmtDelta(change.delta))}</span>` : '';
+      return `<td class="diff"><span class="was">${esc.html(change.left) || '<em>empty</em>'}</span>` +
+             ` <span class="arrow">→</span> <span class="now">${esc.html(change.right) || '<em>empty</em>'}</span>${delta}</td>`;
+    }).join('');
+    const keyStr = result.meta.keys
+      ? result.meta.keys.map((k) => esc.html(ch.key?.[k] ?? '')).join(' / ')
+      : `row ${esc.html(ch.key?.row)}`;
+    return `<tr><th>${keyStr}</th>${cells}</tr>`;
+  }).join('\n');
+
+  const list = (entries, cls) => entries.length
+    ? `<ul class="keys">${entries.slice(0, 500).map((e) =>
+        `<li><code>${esc.html(result.meta.keys ? result.meta.keys.map((k) => e.key?.[k] ?? '').join(' ') : 'row ' + e.key?.row)}</code></li>`,
+      ).join('')}${entries.length > 500 ? `<li>…and ${entries.length - 500} more</li>` : ''}</ul>`
+    : '<p class="none">None</p>';
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc.html(title)}</title>
+<style>
+  :root { color-scheme: light dark; --add:#0a7d33; --del:#b3261e; --chg:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 2rem; max-width: 1100px; margin-inline: auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+  .sub { opacity: .65; margin-bottom: 1.5rem; font-size: .87rem; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap: .75rem; margin-bottom: 1.75rem; }
+  .card { border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-radius: 10px; padding: .7rem .9rem; }
+  .card b { display: block; font-size: 1.55rem; line-height: 1.2; }
+  .card span { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; opacity: .6; }
+  .card.added b { color: var(--add); } .card.removed b { color: var(--del); } .card.changed b { color: var(--chg); }
+  table { border-collapse: collapse; width: 100%; font-size: .85rem; display: block; overflow-x: auto; }
+  th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent); vertical-align: top; }
+  thead th { position: sticky; top: 0; background: Canvas; }
+  td.diff .was { color: var(--del); text-decoration: line-through; text-decoration-thickness: 1px; }
+  td.diff .now { color: var(--add); font-weight: 600; }
+  .delta { font-size: .72rem; opacity: .7; font-variant-numeric: tabular-nums; }
+  .keys { columns: 3; font-size: .8rem; padding-left: 1.1rem; }
+  h2 { font-size: 1rem; margin: 2rem 0 .5rem; text-transform: uppercase; letter-spacing: .06em; opacity: .7; }
+  .warn { border-left: 3px solid var(--chg); padding: .4rem .8rem; margin: .3rem 0; background: color-mix(in srgb, var(--chg) 8%, transparent); }
+  .none { opacity: .5; font-style: italic; }
+  footer { margin-top: 2.5rem; font-size: .75rem; opacity: .5; }
+</style>
+</head>
+<body>
+<h1>${esc.html(title)}</h1>
+<div class="sub">${result.meta.keys ? `keyed on <code>${esc.html(result.meta.keys.join(', '))}</code>` : 'compared by row position'} · ${s.leftRows} → ${s.rightRows} rows${result.meta.tolerance ? ` · tolerance ${esc.html(result.meta.tolerance)}` : ''}</div>
+
+<div class="cards">
+  <div class="card"><b>${s.leftRows}</b><span>left rows</span></div>
+  <div class="card"><b>${s.rightRows}</b><span>right rows</span></div>
+  <div class="card added"><b>${s.added}</b><span>added</span></div>
+  <div class="card removed"><b>${s.removed}</b><span>removed</span></div>
+  <div class="card changed"><b>${s.changed}</b><span>changed</span></div>
+  <div class="card"><b>${s.unchanged}</b><span>unchanged</span></div>
+</div>
+
+${result.warnings.map((w) => `<div class="warn">⚠️ ${esc.html(w)}</div>`).join('\n')}
+
+${churn.length ? `<h2>Churn by column</h2><table><thead><tr><th>column</th><th>changed cells</th></tr></thead><tbody>${
+  churn.map(([c, n]) => `<tr><td><code>${esc.html(c)}</code></td><td>${n}</td></tr>`).join('')
+}</tbody></table>` : ''}
+
+<h2>Changed rows (${result.changed.length})</h2>
+${result.changed.length ? `<table><thead><tr><th>key</th>${result.meta.compareColumns.map((c) => `<th>${esc.html(c)}</th>`).join('')}</tr></thead><tbody>
+${rows}
+</tbody></table>` : '<p class="none">None</p>'}
+
+<h2>Added (${result.added.length})</h2>
+${list(result.added)}
+
+<h2>Removed (${result.removed.length})</h2>
+${list(result.removed)}
+
+<footer>Generated by rowdiff · ${new Date().toISOString().slice(0, 19).replace('T', ' ')} UTC</footer>
+</body>
+</html>
+`;
+}
+
+function toJunit(result, { suiteName = 'csv-diff' } = {}) {
+  const failures = result.summary.changed;
+  const tests = Math.max(1, result.summary.matched + result.summary.added + result.summary.removed);
+  const cases = [];
+
+  for (const ch of result.changed) {
+    const keyStr = result.meta.keys
+      ? result.meta.keys.map((k) => `${k}=${ch.key?.[k]}`).join(' ')
+      : `row ${ch.key?.row}`;
+    const detail = ch.changes.map((c) => `${c.column}: ${JSON.stringify(c.left)} -> ${JSON.stringify(c.right)}`).join('\n');
+    cases.push(
+      `    <testcase classname="${esc.xml(suiteName)}" name="${esc.xml(`changed ${keyStr}`)}">\n` +
+      `      <failure message="${esc.xml(detail.split('\n')[0])}">${esc.xml(detail)}</failure>\n` +
+      `    </testcase>`,
+    );
+  }
+  for (const a of result.added) {
+    cases.push(`    <testcase classname="${esc.xml(suiteName)}" name="${esc.xml(`added ${keyLabel(a, result.meta.keys)}`)}"/>`);
+  }
+  for (const r of result.removed) {
+    cases.push(`    <testcase classname="${esc.xml(suiteName)}" name="${esc.xml(`removed ${keyLabel(r, result.meta.keys)}`)}"/>`);
+  }
+  if (cases.length === 0) cases.push(`    <testcase classname="${esc.xml(suiteName)}" name="no differences"/>`);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="rowdiff" tests="${tests}" failures="${failures}">
+  <testsuite name="${esc.xml(suiteName)}" tests="${tests}" failures="${failures}">
+${cases.join('\n')}
+  </testsuite>
+</testsuites>
+`;
+}
+
+const SARIF_LEVEL = { changed: 'error', removed: 'warning', added: 'note' };
+
+function toSarif(result, { uri = 'left.csv' } = {}) {
+  const results = [];
+
+  for (const ch of result.changed) {
+    for (const c of ch.changes) {
+      const keyStr = result.meta.keys
+        ? result.meta.keys.map((k) => `${k}=${ch.key?.[k]}`).join(' ')
+        : `row ${ch.key?.row}`;
+      results.push({
+        ruleId: 'changed-cell',
+        level: 'error',
+        message: {
+          text: `${keyStr}: column "${c.column}" changed from ${JSON.stringify(c.left)} to ${JSON.stringify(c.right)}` +
+            (c.kind === 'number' ? ` (delta ${fmtDelta(c.delta)})` : ''),
+        },
+        locations: [{
+          physicalLocation: {
+            artifactLocation: { uri },
+            region: { startLine: (Number(ch.key?.row) || 1) + 1 },
+          },
+        }],
+        properties: { key: ch.key, column: c.column, before: c.left, after: c.right },
+      });
+    }
+  }
+
+  for (const [kind, entries] of [['removed', result.removed], ['added', result.added]]) {
+    for (const e of entries) {
+      results.push({
+        ruleId: kind === 'removed' ? 'removed-row' : 'added-row',
+        level: SARIF_LEVEL[kind],
+        message: { text: `${kind} row: ${keyLabel(e, result.meta.keys)}` },
+        locations: [{ physicalLocation: { artifactLocation: { uri }, region: { startLine: 1 } } }],
+        properties: { key: e.key },
+      });
+    }
+  }
+
+  return JSON.stringify({
+    $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+    version: '2.1.0',
+    runs: [{
+      tool: {
+        driver: {
+          name: 'rowdiff',
+          informationUri: 'https://github.com/rowdiff/rowdiff',
+          rules: [
+            { id: 'changed-cell', name: 'ChangedCell', shortDescription: { text: 'A cell changed between the two files' } },
+            { id: 'added-row', name: 'AddedRow', shortDescription: { text: 'A row exists only in the right file' } },
+            { id: 'removed-row', name: 'RemovedRow', shortDescription: { text: 'A row exists only in the left file' } },
+          ],
+        },
+      },
+      results,
+    }],
+  }, null, 2) + '\n';
+}
+
+const FREE_FORMATS = ['text', 'json', 'csv'];
+const PRO_FORMATS = ['md', 'markdown', 'html', 'junit', 'sarif'];
+
+function render(format, result, opts = {}) {
+  switch (format) {
+    case 'text': return toText(result);
+    case 'json': return toJson(result);
+    case 'csv': return toCsv(result);
+    case 'md':
+    case 'markdown': return toMarkdown(result);
+    case 'html': return toHtml(result, opts);
+    case 'junit': return toJunit(result, opts);
+    case 'sarif': return toSarif(result, opts);
+    default: throw new Error(`Unknown report format "${format}". Known: ${[...FREE_FORMATS, ...PRO_FORMATS].join(', ')}`);
+  }
+}
+
+// Key-column detection, shared by the CLI's --detect and the web app's key dropdown.
+// Pure functions only: no fs, no process, so it runs in the browser too.
+
+const ID_NAME_RE = /^(id|_id|.*_id|.*id|key|uuid|guid|sku|code|ref|reference|no|number|num|invoice|order|account|iban|ean|isbn)$/i;
+const CHURN_NAME_RE = /(amount|total|balance|price|qty|quantity|sum|value|updated|modified|timestamp|date|status)/i;
+
+function detectKeys(left, right) {
+  const shared = left.header.filter((h) => right.header.includes(h));
+  if (shared.length === 0) return { candidates: [], best: null };
+
+  const leftIndex = indexColumn(left.rows);
+  const rightIndex = indexColumn(right.rows);
+
+  const candidates = shared.map((col) => {
+    const l = leftIndex.get(col);
+    const r = rightIndex.get(col);
+    const lNonNull = l.total - l.blank;
+    const rNonNull = r.total - r.blank;
+
+    // Fraction of rows on each side whose value also exists on the other side.
+    let lFound = 0;
+    for (const v of l.values) if (r.values.has(v)) lFound++;
+    let rFound = 0;
+    for (const v of r.values) if (l.values.has(v)) rFound++;
+    const overlap = l.values.size && r.values.size
+      ? (lFound / Math.max(1, l.values.size) + rFound / Math.max(1, r.values.size)) / 2
+      : 0;
+
+    const uniqueness = 1 - (l.duplicates + r.duplicates) / Math.max(1, lNonNull + rNonNull);
+    const blankRatio = 1 - (lNonNull + rNonNull) / Math.max(1, l.total + r.total);
+    const nameBonus = ID_NAME_RE.test(col) ? 1 : 0;
+    const churnPenalty = CHURN_NAME_RE.test(col) ? 0.5 : 0;
+    const cardinality = (l.values.size + r.values.size) / Math.max(2, l.total + r.total);
+
+    const score =
+      overlap * 3 +
+      uniqueness * 2 +
+      nameBonus +
+      Math.min(1, cardinality) * 0.5 -
+      blankRatio * 2 -
+      churnPenalty;
+
+    return {
+      column: col,
+      score: Number(score.toFixed(3)),
+      overlap: Number(overlap.toFixed(3)),
+      uniqueness: Number(uniqueness.toFixed(3)),
+      blankRatio: Number(blankRatio.toFixed(3)),
+      duplicateValues: l.duplicates + r.duplicates,
+      cardinality: Number(cardinality.toFixed(3)),
+      reasons: {
+        overlap,
+        uniqueness,
+        nameBonus,
+        churnPenalty,
+        blankRatio,
+        cardinality,
+      },
+    };
+  });
+
+  candidates.sort((a, b) => b.score - a.score || a.column.localeCompare(b.column));
+  return { candidates, best: candidates[0] || null };
+}
+
+function indexColumn(rows) {
+  const map = new Map();
+  const touch = (col) => {
+    if (!map.has(col)) map.set(col, { values: new Set(), total: 0, blank: 0, duplicates: 0, seen: new Set() });
+    return map.get(col);
+  };
+  const allCols = rows.length ? Object.keys(rows[0]) : [];
+  for (const col of allCols) touch(col);
+  for (const row of rows) {
+    for (const col of allCols) {
+      const entry = touch(col);
+      const raw = row[col];
+      const v = raw == null ? '' : String(raw).trim();
+      entry.total++;
+      if (v === '') {
+        entry.blank++;
+        continue;
+      }
+      if (entry.values.has(v)) entry.duplicates++;
+      else entry.values.add(v);
+    }
+  }
+  return map;
+}
+
+
+window.Rowdiff = { parse, diff, render, detectKeys, hasDifferences, toText, toJson, toMarkdown, toHtml, parseNumber };
+})();
+
+</script>
+<script>
+(function () {
+  'use strict';
+  const { parse, diff, render, detectKeys } = window.Rowdiff;
+
+  const state = { left: null, right: null, result: null };
+  const $ = (id) => document.getElementById(id);
+
+  const els = {
+    run: $('run'), key: $('key'), tolerance: $('tolerance'), format: $('format'),
+    ignorecase: $('ignorecase'), collapse: $('collapse'), currency: $('currency'),
+    results: $('results'), placeholder: $('placeholder'), stats: $('stats'),
+    warnings: $('warnings'), tableHost: $('table-host'), columnsHost: $('columns-host'),
+    exportText: $('export-text'),
+  };
+
+  const SAMPLE = {
+    before: `invoice_id,customer,amount,status,updated_at
+INV-1001,"Acme, Inc.",1250.00,paid,2026-01-05
+INV-1002,Globex,980.50,paid,2026-01-05
+INV-1003,"Initech Europe",430.00,open,2026-01-06
+INV-1004,Umbrella,2750.25,open,2026-01-06
+INV-1005,"Stark, Howard",90.00,paid,2026-01-07
+`,
+    after: `invoice_id,customer,amount,status,updated_at
+INV-1001,"Acme, Inc.",1250.00,paid,2026-01-05
+INV-1002,Globex,980.50,overdue,2026-01-12
+INV-1003,"Initech Europe",430.00,paid,2026-01-12
+INV-1004,Umbrella,2750.30,open,2026-01-06
+INV-1006,"Wayne Enterprises",5000.00,open,2026-01-12
+`,
+  };
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function readFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  async function load(side, file) {
+    if (!file) return;
+    try {
+      const buf = await readFile(file);
+      const parsed = parse(buf, { delimiter: 'auto' });
+      state[side] = { name: file.name, parsed };
+      const info = $('info-' + side);
+      info.textContent = `${file.name} — ${parsed.rows.length} rows, ${parsed.header.length} columns` +
+        (parsed.delimiter === '\t' ? ' (tab)' : ` (${parsed.delimiter})`);
+      info.className = 'fileinfo ok';
+      state.result = null;
+      els.results.hidden = true;
+      els.placeholder.hidden = false;
+      refreshKeys();
+    } catch (err) {
+      const info = $('info-' + side);
+      info.textContent = `Could not read ${file.name}: ${err.message}`;
+      info.className = 'fileinfo';
+    }
+  }
+
+  function refreshKeys() {
+    const left = state.left?.parsed;
+    const right = state.right?.parsed;
+    els.run.disabled = !(left && right);
+    if (!left || !right) return;
+
+    const shared = left.header.filter((h) => right.header.includes(h));
+    const { best } = detectKeys(left, right);
+    els.key.innerHTML = '<option value="">— compare by position —</option>' +
+      shared.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    if (best && best.score > 0.5) els.key.value = best.column;
+  }
+
+  function currentOptions() {
+    return {
+      keys: els.key.value ? [els.key.value] : null,
+      tolerance: Number(els.tolerance.value) || 0,
+      ignoreCase: els.ignorecase.checked,
+      collapseWhitespace: els.collapse.checked,
+      stripCurrency: els.currency.checked,
+    };
+  }
+
+  function showError(err) {
+    els.placeholder.hidden = true;
+    els.results.hidden = true;
+    els.warnings.innerHTML = `<div class="warnbox">Something went wrong: ${esc(err && err.message ? err.message : err)}</div>`;
+  }
+
+  window.addEventListener('error', (e) => showError(e.error || e.message));
+
+  function runCompare() {
+    if (!state.left || !state.right) return;
+    const result = diff(state.left.parsed, state.right.parsed, currentOptions());
+    state.result = result;
+
+    els.placeholder.hidden = true;
+    els.results.hidden = false;
+
+    const s = result.summary;
+    els.stats.innerHTML = [
+      ['', s.leftRows, 'before rows'], ['', s.rightRows, 'after rows'],
+      ['a', s.added, 'added'], ['d', s.removed, 'removed'], ['c', s.changed, 'changed'], ['', s.unchanged, 'unchanged'],
+    ].map(([cls, n, label]) => `<div class="stat ${cls}"><b>${n}</b><span>${label}</span></div>`).join('');
+
+    els.warnings.innerHTML = result.warnings.map((w) => `<div class="warnbox">⚠️ ${esc(w)}</div>`).join('');
+
+    renderTable(result);
+    renderColumns(result);
+    updateExport(result);
+  }
+
+  function renderTable(result) {
+    const keys = result.meta.keys || [];
+    const keySet = new Set(keys);
+    const allCols = [...new Set([...result.columns.left, ...result.columns.right])].filter((c) => !keySet.has(c));
+    const tag = (cls, text) => `<td class="tagcell"><span class="tag ${cls}">${text}</span></td>`;
+
+    const rows = [];
+
+    for (const ch of result.changed) {
+      const cells = allCols.map((col) => {
+        const change = ch.changes.find((x) => x.column === col);
+        if (!change) return `<td>${esc(ch.after[col] ?? '')}</td>`;
+        const delta = change.kind === 'number'
+          ? ` <span class="delta">${change.delta > 0 ? '+' : ''}${Number(change.delta.toFixed(6))}</span>`
+          : '';
+        const was = change.left === '' ? '<em>empty</em>' : esc(change.left);
+        const now = change.right === '' ? '<em>empty</em>' : esc(change.right);
+        return `<td><span class="was">${was}</span> → <span class="now">${now}</span>${delta}</td>`;
+      });
+      const keyText = keys.length ? keys.map((k) => ch.key?.[k]).join(' / ') : `row ${ch.key?.row}`;
+      rows.push(`<tr class="rowchanged">${tag('c', 'changed')}<td class="keycell">${esc(keyText)}</td>${cells.join('')}</tr>`);
+    }
+
+    for (const a of result.added.slice(0, 500)) {
+      const cells = allCols.map((c) => `<td>${esc(a.row[c] ?? '')}</td>`).join('');
+      const keyText = keys.length ? keys.map((k) => a.key?.[k]).join(' / ') : '';
+      rows.push(`<tr class="rowadded">${tag('a', 'added')}<td class="keycell">${esc(keyText)}</td>${cells}</tr>`);
+    }
+
+    for (const r of result.removed.slice(0, 500)) {
+      const cells = allCols.map((c) => `<td>${esc(r.row[c] ?? '')}</td>`).join('');
+      const keyText = keys.length ? keys.map((k) => r.key?.[k]).join(' / ') : '';
+      rows.push(`<tr class="rowremoved">${tag('d', 'removed')}<td class="keycell">${esc(keyText)}</td>${cells}</tr>`);
+    }
+
+    if (rows.length === 0) {
+      els.tableHost.innerHTML = '<div class="empty">The two files are identical on the compared columns.</div>';
+      return;
+    }
+
+    const head = `<thead><tr><th>change</th><th>${keys.length ? esc(keys.join(' / ')) : 'key'}</th>` +
+      allCols.map((c) => `<th>${esc(c)}</th>`).join('') + '</tr></thead>';
+
+    els.tableHost.innerHTML = `<table class="diff">${head}<tbody>${rows.join('')}</tbody></table>` +
+      (result.added.length > 500 || result.removed.length > 500
+        ? `<div class="empty">Showing the first 500 added/removed rows. Export for the full list.</div>` : '');
+  }
+
+  function renderColumns(result) {
+    const entries = Object.entries(result.columnStats).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    if (entries.length === 0) {
+      els.columnsHost.innerHTML = '<div class="empty">No comparable columns.</div>';
+      return;
+    }
+    const total = entries.reduce((n, [, v]) => n + v, 0);
+    els.columnsHost.innerHTML = `<table class="diff"><thead><tr><th>column</th><th>changed cells</th></tr></thead><tbody>` +
+      entries.map(([c, n]) => `<tr><td>${esc(c)}</td><td>${n}</td></tr>`).join('') +
+      `</tbody><tfoot><tr><th>total</th><th>${total}</th></tr></tfoot></table>`;
+  }
+
+  function updateExport(result) {
+    const fmt = els.format.value;
+    const nameBase = (state.left?.name || 'before').replace(/\.[^.]+$/, '');
+    if (fmt === 'table' || fmt === 'json' || fmt === 'csv' || fmt === 'md' || fmt === 'html') {
+      const map = { table: 'md', md: 'md', json: 'json', csv: 'csv', html: 'html' };
+      els.exportText.value = render(map[fmt], result, { title: `${state.left?.name} → ${state.right?.name}` });
+      els.exportText.dataset.ext = map[fmt];
+      els.exportText.dataset.name = `${nameBase}-diff`;
+    }
+  }
+
+  // --- wiring ---
+  for (const side of ['left', 'right']) {
+    const input = $('file-' + side);
+    const zone = $('dz-' + side);
+    document.querySelector(`[data-pick="${side}"]`).addEventListener('click', () => input.click());
+    input.addEventListener('change', () => load(side, input.files[0]));
+
+    ['dragenter', 'dragover'].forEach((ev) => zone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      zone.classList.add('over');
+    }));
+    ['dragleave', 'drop'].forEach((ev) => zone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      zone.classList.remove('over');
+    }));
+    zone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer?.files?.[0];
+      if (file) load(side, file);
+    });
+  }
+
+  $('demo').addEventListener('click', () => {
+   try {
+    for (const [side, text] of [['left', SAMPLE.before], ['right', SAMPLE.after]]) {
+      const parsed = parse(text, { delimiter: 'auto' });
+      state[side] = { name: `example_${side}.csv`, parsed };
+      const info = $('info-' + side);
+      info.textContent = `example_${side}.csv — ${parsed.rows.length} rows, ${parsed.header.length} columns`;
+      info.className = 'fileinfo ok';
+    }
+    refreshKeys();
+    runCompare();
+   } catch (err) { showError(err); }
+  });
+
+  els.run.addEventListener('click', () => { try { runCompare(); } catch (e) { showError(e); } });
+  els.key.addEventListener('change', () => { if (state.result) runCompare(); });
+  els.format.addEventListener('change', () => { if (state.result) updateExport(state.result); });
+  [els.ignorecase, els.collapse, els.currency].forEach((el) => el.addEventListener('change', () => {
+    if (state.result) runCompare();
+  }));
+  els.tolerance.addEventListener('input', () => { if (state.result) runCompare(); });
+
+  document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.tabpane').forEach((p) => p.classList.toggle('active', p.id === tab.dataset.pane));
+  }));
+
+  $('copy').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(els.exportText.value);
+      $('copy').textContent = 'Copied';
+      setTimeout(() => ($('copy').textContent = 'Copy'), 1200);
+    } catch {
+      els.exportText.select();
+    }
+  });
+
+  $('download').addEventListener('click', () => {
+    const ext = els.exportText.dataset.ext || 'txt';
+    const blob = new Blob([els.exportText.value], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${els.exportText.dataset.name || 'diff'}.${ext}`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+})();
+</script>
+</body>
+</html>
