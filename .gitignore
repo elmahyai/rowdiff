@@ -3,3 +3,4 @@ node_modules/
 .rowdiff-license
 .license-keys/
 *.tgz
+.agents/
