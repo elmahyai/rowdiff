@@ -246,7 +246,7 @@ export function configToFlags(config) {
 }
 
 const STARTER_CONFIG = {
-  $schema: 'https://raw.githubusercontent.com/rowdiff/rowdiff/main/schema.json',
+  $schema: 'https://raw.githubusercontent.com/elmahyai/rowdiff/main/schema.json',
   key: ['id'],
   tolerance: 0.01,
   ignoreCase: true,

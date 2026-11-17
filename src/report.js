@@ -382,7 +382,7 @@ export function toSarif(result, { uri = 'left.csv' } = {}) {
       tool: {
         driver: {
           name: 'rowdiff',
-          informationUri: 'https://github.com/rowdiff/rowdiff',
+          informationUri: 'https://github.com/elmahyai/rowdiff',
           rules: [
             { id: 'changed-cell', name: 'ChangedCell', shortDescription: { text: 'A cell changed between the two files' } },
             { id: 'added-row', name: 'AddedRow', shortDescription: { text: 'A row exists only in the right file' } },

@@ -15,5 +15,5 @@
     "prepublishOnly": "node --test && node tools/build-web.mjs"
   },
   "keywords": ["csv", "diff", "reconcile", "compare", "csv-diff", "data-quality", "ci", "cli"],
-  "repository": { "type": "git", "url": "git+https://github.com/rowdiff/rowdiff.git" }
+  "repository": { "type": "git", "url": "git+https://github.com/elmahyai/rowdiff.git" }
 }
