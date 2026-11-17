@@ -4,16 +4,39 @@
   "description": "Diff and reconcile CSV files by key column: added, removed and changed rows, with tolerances, CI reports and a local-first web app.",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE",
-  "bin": { "rowdiff": "bin/rowdiff.mjs" },
+  "bin": {
+    "rowdiff": "bin/rowdiff.mjs"
+  },
   "main": "src/index.js",
-  "exports": { ".": "./src/index.js" },
-  "files": ["bin", "src", "README.md", "LICENSE"],
-  "engines": { "node": ">=18" },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "test": "node --test",
     "build:web": "node tools/build-web.mjs",
     "prepublishOnly": "node --test && node tools/build-web.mjs"
   },
-  "keywords": ["csv", "diff", "reconcile", "compare", "csv-diff", "data-quality", "ci", "cli"],
-  "repository": { "type": "git", "url": "git+https://github.com/elmahyai/rowdiff.git" }
+  "keywords": [
+    "csv",
+    "diff",
+    "reconcile",
+    "compare",
+    "csv-diff",
+    "data-quality",
+    "ci",
+    "cli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elmahyai/rowdiff.git"
+  }
 }
